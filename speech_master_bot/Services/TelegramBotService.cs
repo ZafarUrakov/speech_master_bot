@@ -74,132 +74,141 @@ namespace speech_master_bot.Services
 
         private async ValueTask BotOnMessageRecieved(Message message)
         {
-            var voice = message.Voice;
-
-            var fileId = message.Voice.FileId;
-            var file1 = await this.telegramBotClient.GetFileAsync(fileId);
-            string filePath1 = file1.FilePath;
-
-
-            var filePath = "../../../wwwroot/audio.ogg";
-
-            using (var fileStream = new FileStream(filePath, FileMode.Create))
+            if (message.Text is not null)
             {
-                await this.telegramBotClient.DownloadFileAsync(file1.FilePath, fileStream);
+                await this.telegramBotClient.SendTextMessageAsync(
+                    chatId: message.Chat.Id,
+                    text: "here text");
             }
-
-            string mp3FilePath = "../../../wwwroot/audio.wav";
-
-            ConvertOggToWav(filePath, mp3FilePath);
-
-            var config = SpeechConfig.FromSubscription("b0865984f22d42ebb91601daa3eb27a7", "eastus");
-
-            string language = "en-US";
-            string topic = "your own topic";
-
-            var audioConfig = AudioConfig.FromWavFileInput(mp3FilePath);
-
-            var speechRecognizer = new SpeechRecognizer(config, language.Replace("_", "-"), audioConfig);
-
-            var connection = Connection.FromRecognizer(speechRecognizer);
-
-            var phraseDetectionConfig = new
+            else
             {
-                enrichment = new
+                var voice = message.Voice;
+
+                var fileId = message.Voice.FileId;
+                var file1 = await this.telegramBotClient.GetFileAsync(fileId);
+                string filePath1 = file1.FilePath;
+
+
+                var filePath = "../../../wwwroot/audio.ogg";
+
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
                 {
-                    pronunciationAssessment = new
-                    {
-                        referenceText = "",
-                        gradingSystem = "HundredMark",
-                        granularity = "Word",
-                        dimension = "Comprehensive",
-                        enableMiscue = "False",
-                        enableProsodyAssessment = "True"
-                    },
-                    contentAssessment = new
-                    {
-                        topic = topic
-                    }
+                    await this.telegramBotClient.DownloadFileAsync(file1.FilePath, fileStream);
                 }
-            };
-            connection.SetMessageProperty("speech.context", "phraseDetection", JsonConvert.SerializeObject(phraseDetectionConfig));
 
-            var phraseOutputConfig = new
-            {
-                format = "Detailed",
-                detailed = new
+                string mp3FilePath = "../../../wwwroot/audio.wav";
+
+                ConvertOggToWav(filePath, mp3FilePath);
+
+                var config = SpeechConfig.FromSubscription("b0865984f22d42ebb91601daa3eb27a7", "eastus");
+
+                string language = "en-US";
+                string topic = "your own topic";
+
+                var audioConfig = AudioConfig.FromWavFileInput(mp3FilePath);
+
+                var speechRecognizer = new SpeechRecognizer(config, language.Replace("_", "-"), audioConfig);
+
+                var connection = Connection.FromRecognizer(speechRecognizer);
+
+                var phraseDetectionConfig = new
                 {
-                    options = new[]
+                    enrichment = new
                     {
+                        pronunciationAssessment = new
+                        {
+                            referenceText = "",
+                            gradingSystem = "HundredMark",
+                            granularity = "Word",
+                            dimension = "Comprehensive",
+                            enableMiscue = "False",
+                            enableProsodyAssessment = "True"
+                        },
+                        contentAssessment = new
+                        {
+                            topic = topic
+                        }
+                    }
+                };
+                connection.SetMessageProperty("speech.context", "phraseDetection", JsonConvert.SerializeObject(phraseDetectionConfig));
+
+                var phraseOutputConfig = new
+                {
+                    format = "Detailed",
+                    detailed = new
+                    {
+                        options = new[]
+                        {
                     "WordTimings",
                     "PronunciationAssessment",
                     "ContentAssessment",
                     "SNR",
                 }
-                }
-            };
+                    }
+                };
 
-            connection.SetMessageProperty("speech.context", "phraseOutput", JsonConvert.SerializeObject(phraseOutputConfig));
+                connection.SetMessageProperty("speech.context", "phraseOutput", JsonConvert.SerializeObject(phraseOutputConfig));
 
-            var done = false;
-            var fullRecognizedText = "";
+                var done = false;
+                var fullRecognizedText = "";
 
-            speechRecognizer.SessionStopped += (s, e) =>
-            {
-                Console.WriteLine("Closing on {0}", e);
-                done = true;
-            };
-
-            speechRecognizer.Canceled += (s, e) =>
-            {
-                Console.WriteLine("Closing on {0}", e);
-                done = true;
-            };
-
-            connection.MessageReceived += async (s, e) =>
-            {
-                if (e.Message.IsTextMessage())
+                speechRecognizer.SessionStopped += (s, e) =>
                 {
-                    var messageText = e.Message.GetTextMessage();
-                    var json = Newtonsoft.Json.Linq.JObject.Parse(messageText);
-                    var nBest = json["NBest"][0];
-                    if (json.ContainsKey("NBest"))
+                    Console.WriteLine("Closing on {0}", e);
+                    done = true;
+                };
+
+                speechRecognizer.Canceled += (s, e) =>
+                {
+                    Console.WriteLine("Closing on {0}", e);
+                    done = true;
+                };
+
+                connection.MessageReceived += async (s, e) =>
+                {
+                    if (e.Message.IsTextMessage())
                     {
-                        if (json["NBest"][0]["Display"].ToString().Trim().Length > 1)
+                        var messageText = e.Message.GetTextMessage();
+                        var json = Newtonsoft.Json.Linq.JObject.Parse(messageText);
+                        var nBest = json["NBest"][0];
+                        if (json.ContainsKey("NBest"))
                         {
-                            var recognizedText = json["DisplayText"];
+                            if (json["NBest"][0]["Display"].ToString().Trim().Length > 1)
+                            {
+                                var recognizedText = json["DisplayText"];
 
-                            fullRecognizedText += $" {recognizedText}";
-                            var accuracyScore = nBest["PronunciationAssessment"]["AccuracyScore"].ToString();
-                            var fluencyScore = nBest["PronunciationAssessment"]["FluencyScore"].ToString();
-                            var prosodyScore = nBest["PronunciationAssessment"]["ProsodyScore"].ToString();
-                            var completenessScore = nBest["PronunciationAssessment"]["CompletenessScore"].ToString();
-                            var pronScore = nBest["PronunciationAssessment"]["PronScore"].ToString();
+                                fullRecognizedText += $" {recognizedText}";
+                                var accuracyScore = nBest["PronunciationAssessment"]["AccuracyScore"].ToString();
+                                var fluencyScore = nBest["PronunciationAssessment"]["FluencyScore"].ToString();
+                                var prosodyScore = nBest["PronunciationAssessment"]["ProsodyScore"].ToString();
+                                var completenessScore = nBest["PronunciationAssessment"]["CompletenessScore"].ToString();
+                                var pronScore = nBest["PronunciationAssessment"]["PronScore"].ToString();
 
-                            await this.telegramBotClient.SendTextMessageAsync(
-                                chatId: message.Chat.Id,
-                                text: $"Accuracy Score {accuracyScore}\n" +
-                                $"Fluency Score: {fluencyScore}\n" +
-                                $"Prosody Score {prosodyScore}\n" +
-                                $"Completeness Score {completenessScore}\n" +
-                                $"PronScore {pronScore}");
-                        }
-                        else
-                        {
-                            throw new Exception();
+                                await this.telegramBotClient.SendTextMessageAsync(
+                                    chatId: message.Chat.Id,
+                                    text: $"Accuracy Score {accuracyScore}\n" +
+                                    $"Fluency Score: {fluencyScore}\n" +
+                                    $"Prosody Score {prosodyScore}\n" +
+                                    $"Completeness Score {completenessScore}\n" +
+                                    $"PronScore {pronScore}");
+                            }
+                            else
+                            {
+                                throw new Exception();
+                            }
                         }
                     }
+                };
+
+                await speechRecognizer.StartContinuousRecognitionAsync().ConfigureAwait(false);
+
+                while (!done)
+                {
+                    await Task.Delay(1000);
                 }
-            };
 
-            await speechRecognizer.StartContinuousRecognitionAsync().ConfigureAwait(false);
-
-            while (!done)
-            {
-                await Task.Delay(1000);
+                await speechRecognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
             }
-
-            await speechRecognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
         }
 
         static void ConvertOggToWav(string inputFilePath, string outputFilePath)
