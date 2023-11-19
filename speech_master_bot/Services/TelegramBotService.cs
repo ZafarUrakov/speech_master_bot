@@ -170,10 +170,10 @@ namespace speech_master_bot.Services
                     {
                         var messageText = e.Message.GetTextMessage();
                         var json = Newtonsoft.Json.Linq.JObject.Parse(messageText);
-                        var nBest = json["NBest"][0];
                         if (json.ContainsKey("NBest"))
                         {
-                            if (json["NBest"][0]["Display"].ToString().Trim().Length > 1)
+                            var nBest = json["NBest"][0];
+                            if (nBest["Display"].ToString().Trim().Length > 1)
                             {
                                 var recognizedText = json["DisplayText"];
 
