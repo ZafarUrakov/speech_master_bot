@@ -74,10 +74,6 @@ namespace speech_master_bot.Services
 
         private async ValueTask BotOnMessageRecieved(Message message)
         {
-
-            await this.telegramBotClient.SendTextMessageAsync(
-                chatId: message.Chat.Id,
-                text: "here text");
             var voice = message.Voice;
 
             var fileId = message.Voice.FileId;
