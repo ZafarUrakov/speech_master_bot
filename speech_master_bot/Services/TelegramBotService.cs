@@ -74,6 +74,7 @@ namespace speech_master_bot.Services
 
         private async ValueTask BotOnMessageRecieved(Message message)
         {
+
             if (message.Text is not null)
             {
                 await this.telegramBotClient.SendTextMessageAsync(
@@ -88,17 +89,20 @@ namespace speech_master_bot.Services
                 var file1 = await this.telegramBotClient.GetFileAsync(fileId);
                 string filePath1 = file1.FilePath;
 
+                var voiceFile = await this.telegramBotClient.GetFileAsync(voice.FileId);
 
                 var filePath = "../../../wwwroot/audio.ogg";
 
                 using (var fileStream = new FileStream(filePath, FileMode.Create))
                 {
-                    await this.telegramBotClient.DownloadFileAsync(file1.FilePath, fileStream);
+                    await this.telegramBotClient.DownloadFileAsync(voiceFile.FilePath, fileStream);
                 }
 
                 string mp3FilePath = "../../../wwwroot/audio.wav";
 
                 ConvertOggToWav(filePath, mp3FilePath);
+
+                Console.WriteLine("Конвертация завершена.");
 
                 var config = SpeechConfig.FromSubscription("b0865984f22d42ebb91601daa3eb27a7", "eastus");
 
@@ -164,7 +168,7 @@ namespace speech_master_bot.Services
                     done = true;
                 };
 
-                connection.MessageReceived += async (s, e) =>
+                connection.MessageReceived += (s, e) =>
                 {
                     if (e.Message.IsTextMessage())
                     {
@@ -184,7 +188,7 @@ namespace speech_master_bot.Services
                                 var completenessScore = nBest["PronunciationAssessment"]["CompletenessScore"].ToString();
                                 var pronScore = nBest["PronunciationAssessment"]["PronScore"].ToString();
 
-                                await this.telegramBotClient.SendTextMessageAsync(
+                                this.telegramBotClient.SendTextMessageAsync(
                                     chatId: message.Chat.Id,
                                     text: $"Accuracy Score {accuracyScore}\n" +
                                     $"Fluency Score: {fluencyScore}\n" +
@@ -194,7 +198,7 @@ namespace speech_master_bot.Services
                             }
                             else
                             {
-                                throw new Exception();
+                                Console.WriteLine($"Content Assessment Results for: {fullRecognizedText}");
                             }
                         }
                     }
